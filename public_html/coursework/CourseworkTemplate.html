@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>3D Programming Coursework</title>
+        <link rel="shortcut icon" href="../favicon.ico">
+        <script type="text/javascript" src="../libs/three.js"></script>
+        <script type="text/javascript" src="../libs/jquery.js"></script>
+        <script type="text/javascript" src="../libs/stats.js"></script>
+        <script type="text/javascript" src="../libs/dat.gui.js"></script>
+        <script type="text/javascript" src="../libs/keypress.js"></script>
+        <style>
+            body{
+                /* set margin to 0 and overflow to hidden, to go fullscreen */
+                margin: 0;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="Stats-output">
+        </div>
+        <div id="WebGL-output">
+        </div>
+
+        <script type="text/javascript">
+            // once everything is loaded, we run our Three.js stuff.
+            $(function () {
+                var stats = initStats();
+
+                // create a scene, that will hold all our elements such as objects, cameras and lights.
+                var scene = new THREE.Scene();
+
+                // create a camera, which defines where we're looking at.
+                var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1500); //setting higher distance load all of the dome
+
+                // create a render and set the size
+                var renderer = new THREE.WebGLRenderer();
+                renderer.setClearColor(0xEEEEEE, 1.0);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+
+                var ground = createMesh(new THREE.CircleGeometry(700, 150, 6.5, 6.5), "icesnow.bmp");
+                // rotate and position the ground
+                ground.rotation.x = -0.5 * Math.PI;
+                ground.position.x = 0;
+                //add the mesh to the scene
+                scene.add(ground);
+
+                //Creates a star by taking points
+                var length = 5;
+                var segments = 20;
+                var curve = 0;
+                var starGeometry = createExtrudedGeometry(length, segments, curve);
+                function createExtrudedGeometry(length, segments, curve) {
+                    // this is the cross section
+                    var points = [];
+                    points.push(new THREE.Vector2(0, 5));
+                    points.push(new THREE.Vector2(1, 1));
+                    points.push(new THREE.Vector2(5, 0));
+                    points.push(new THREE.Vector2(1, -1));
+                    points.push(new THREE.Vector2(0, -5));
+                    points.push(new THREE.Vector2(-1, -1));
+                    points.push(new THREE.Vector2(-5, 0));
+                    points.push(new THREE.Vector2(-1, 1));
+                    var shape = new THREE.Shape(points);
+
+                    var extrudeSettings = {steps: segments};
+                    var pathPoints = [];
+                    pathPoints.push(new THREE.Vector3(-length / 2, 0, 0));
+                    pathPoints.push(new THREE.Vector3(0, curve, 0));
+                    pathPoints.push(new THREE.Vector3(length / 2, 0, 0));
+                    extrudeSettings.extrudePath = new THREE.SplineCurve3(pathPoints);
+
+                    var prismGeometry = shape.extrude(extrudeSettings);
+                    return prismGeometry;
+                }
+
+                //First star
+                var firstStar = createMesh(starGeometry, "wood.jpg");
+                firstStar.rotation.y = 1.5;
+                firstStar.position.x = 40;
+                firstStar.position.y = 5;
+                scene.add(firstStar);
+
+                //Second star
+                var secondStar = createMesh(starGeometry, "wood.jpg");
+                secondStar.rotation.y = 1.5;
+                secondStar.position.x = -40;
+                secondStar.position.y = 5;
+                scene.add(secondStar);
+
+                //Dome
+                var limit = 700;
+                var dome = createMesh(new THREE.CylinderGeometry(500, limit, 200, 100, 100, false), "Wall.jpg");
+                dome.position.y = 90;
+                dome.scale.x = -1;
+                scene.add(dome);
+
+                //Creates mesh with a picture
+                function createMesh(geom, imageFile) {
+                    var material = new THREE.MeshPhongMaterial();
+
+                    var texture = new THREE.TextureLoader().load("../assets/textures/general/" + imageFile);
+                    material.map = texture;
+
+                    var mesh = new THREE.Mesh(geom, material);
+
+                    return mesh;
+                }
+
+                //Creating the red lines on the road
+                function creatingRedLines() {
+                    var redLine = [];
+                    var redLineGeometry = new THREE.CubeGeometry(3, 0.1, 20);
+                    var redLineMaterial = new THREE.MeshLambertMaterial({color: 0xff0000});
+                    var distance = 0; // How far in between the lines will be
+                    for (var i = 0; i < 30; ++i) {
+                        redLine[i] = new THREE.Mesh(redLineGeometry, redLineMaterial);
+                        redLine[i].castShadow = true;
+                        redLine[i].position.z = -700 + distance;
+                        redLine[i].position.y = 0.15; //offsetting the graphic glitch if the objects are in the same location
+                        distance += 50; //adding distance
+                        scene.add(redLine[i]);
+                    }
+                }
+                creatingRedLines();
+
+                //Starting line
+                var cubeGeometry = new THREE.CubeGeometry(75, 0.5, 0.5);
+                var cubeMaterial = new THREE.MeshLambertMaterial({color: 0x0000FF});
+                var StartLine = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                scene.add(StartLine);
+
+                //----------Creating the car start-----------
+                var carBodyMaterial = new THREE.MeshLambertMaterial({color: 0x44ff44});
+                var carBodyGeometry = new THREE.CubeGeometry(4, 3.5, 15);
+
+                //Creating a group to which we add the car parts
+                var carGroup = new THREE.Object3D();
+                scene.add(carGroup);
+
+                //Creating a body
+                var body = new THREE.Mesh(carBodyGeometry, carBodyMaterial);
+                carGroup.add(body);
+                body.position.y = 3;
+                body.castShadow = true;
+
+                //Creating a wheel
+                var wheelGeometry = new THREE.CylinderGeometry(2, 2, 2, 20, 20);
+                var wheelMaterial = new THREE.MeshBasicMaterial({color: 0xffff00});
+                var wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.rotation.x = Math.PI / 2;
+                wheel.rotation.z = Math.PI / 2;
+                wheel.castShadow = true;
+
+                //Adds wheels to the car
+                var wheel = [];
+                for (var i = 0; i < 4; ++i) {
+                    wheel[i] = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                    wheel[i].castShadow = true;
+                    wheel[i].rotation.x = Math.PI / 2;
+                    wheel[i].rotation.z = Math.PI / 2;
+                    if (i % 2 === 0) { // i = 0 or 2
+                        wheel[i].position.x = 2.5;
+                    } else { // i = 1 or 3
+                        wheel[i].position.x = -2.5;
+                    }
+                    wheel[i].position.y = 1.9;
+                    if (i < 2) { // i = 0 or 1
+                        wheel[i].position.z = 5;
+                    } else { // i = 2 or 3
+                        wheel[i].position.z = -5;
+                    }
+                    carGroup.add(wheel[i]);
+                }
+                //----------Creating the car end----------
+
+                // add subtle ambient lighting
+                var ambientColor = "#6a6d72";
+                var ambientLight = new THREE.AmbientLight(ambientColor);
+                scene.add(ambientLight);
+
+                // add spotlight for the shadows
+                var spotLight = new THREE.SpotLight(0xffffff);
+                spotLight.position.set(-50, 50, -50);
+                scene.add(spotLight);
+
+                //Light Material
+                var sphereLightMaterial = new
+                        THREE.MeshBasicMaterial({color: 0xdbe244});
+                sphereLightGeometry = new THREE.SphereGeometry(1.5);
+
+                //Add light object, using light's position
+                //Where scene.position replace with spotlight.position
+
+                var lightMesh = new THREE.Mesh(sphereLightGeometry,
+                        sphereLightMaterial);
+                lightMesh.position.copy(spotLight.position);
+                scene.add(lightMesh);
+
+                // add spotlight for the shadows
+                var secondSpotLight = new THREE.SpotLight(0xffffff);
+                secondSpotLight.position.set(300, 150, 300);
+                scene.add(secondSpotLight);
+
+                //Add light object, using light's position
+                //Where scene.position replace with spotlight.position
+                var secondLightMesh = new THREE.Mesh(sphereLightGeometry,
+                        sphereLightMaterial);
+                secondLightMesh.position.copy(secondSpotLight.position);
+                scene.add(secondLightMesh);
+
+                var Speed = 1; // Speed at which the car goes at the start of the scene
+                var ReverseSpeed = 0; // Reverse speed
+                var controls = new function () {
+                    this.WASDControls = 'WASD = Controls';
+                    this.Brake = 'SPACE = Turn Faster';
+                    this.StopCamera = false;
+                    this.IJKLCamera = false;
+                    this.Speed = Speed * 50;
+                    this.ReverseSpeed = ReverseSpeed * 50;
+                    this.height = camera.position.y;
+                    this.orbitAngle = 0;
+                    this.cameraAngle = 0;
+                    this.x = camera.position.x;
+                    this.z = camera.position.z;
+                };
+
+                var gui = new dat.GUI();
+
+                var keys = gui.addFolder('Keyboard controls');
+                keys.add(controls, 'WASDControls');
+                keys.add(controls, 'Brake');
+                keys.add(controls, 'Speed').listen();
+                keys.add(controls, 'ReverseSpeed').listen();
+                keys.open();
+
+                gui.add(controls, 'StopCamera').listen();
+                gui.add(controls, 'IJKLCamera').listen();
+                gui.add(controls, 'x').listen();
+                gui.add(controls, 'height').listen();
+                gui.add(controls, 'z').listen();
+                gui.add(controls, 'orbitAngle').listen();
+                gui.add(controls, 'cameraAngle').listen();
+
+                //Updates speed
+                function UpdateGUI() {
+                    controls.Speed = Speed * 50; //50 is just a multiplier to make speed look better
+                    controls.ReverseSpeed = ReverseSpeed * 50; // Reverse speed
+                    controls.x = camera.position.x;
+                    controls.z = camera.position.z;
+                    controls.cameraAngle = camera.rotation.y * 180 / Math.PI;
+                    controls.height = camera.position.y;
+                    controls.orbitAngle = orbitGroup.rotation.y * 180 / Math.PI;
+                }
+
+                //Accellerate forward
+                function AccelerateCar() {
+                    carGroup.translateZ(+Speed);
+                    carGroup.positionZ += Speed;
+                }
+
+                //Reverse
+                function BreakCar() {
+                    carGroup.translateZ(-ReverseSpeed);
+                    carGroup.positionZ -= ReverseSpeed;
+                }
+
+                //Turns left, rotates the car
+                function TurnLeft() {
+                    if (Speed > SpeedLimitForTurning) {
+                        carGroup.translateX(angle);
+                        carGroup.rotation.y += angle + SpaceButton;
+                    } else if (ReverseSpeed > SpeedLimitForTurning) {
+                        carGroup.translateX(angle);
+                        carGroup.rotation.y += angle + SpaceButton;
+                    }
+                }
+
+                //Lighter turning when reversing
+                function LightTurnLeft() {
+                    if (Speed > SpeedLimitForTurning) {
+                        carGroup.translateX(angle / 8);
+                        carGroup.rotation.y += angle + SpaceButton / 8;
+                    } else if (ReverseSpeed > SpeedLimitForTurning) {
+                        carGroup.translateX(angle / 8);
+                        carGroup.rotation.y += angle + SpaceButton / 8;
+                    }
+                }
+
+                //Turns right, rotates the car
+                function TurnRight() {
+                    if (Speed > SpeedLimitForTurning) {
+                        carGroup.translateX(-angle);
+                        carGroup.rotation.y -= angle + SpaceButton;
+                    } else if (ReverseSpeed > SpeedLimitForTurning) {
+                        carGroup.translateX(-angle);
+                        carGroup.rotation.y -= angle + SpaceButton;
+                    }
+                }
+
+                //Lighter turning when reversing
+                function LightTurnRight() {
+                    if (Speed > SpeedLimitForTurning) {
+                        carGroup.translateX(-angle / 8);
+                        carGroup.rotation.y -= angle + SpaceButton / 8;
+                    } else if (ReverseSpeed > SpeedLimitForTurning) {
+                        carGroup.translateX(-angle / 8);
+                        carGroup.rotation.y -= angle + SpaceButton / 8;
+                    }
+                }
+
+                //Rotating the wheels when turning
+                function WheelRotationRight() {
+                    wheel[0].rotation.z = -Math.PI / 3;
+                    wheel[1].rotation.z = -Math.PI / 3;
+                }
+                function WheelRotationLeft() {
+                    wheel[0].rotation.z = Math.PI / 3;
+                    wheel[1].rotation.z = Math.PI / 3;
+                }
+                function WheelStraight() {
+                    wheel[0].rotation.z = 1.5;
+                    wheel[1].rotation.z = 1.5;
+                }
+
+                //Check car turns, camera
+                var keysDown = {}; //empty object to store which keys are being held down
+
+                window.addEventListener("keydown", function (event) {
+                    keysDown[event.keyCode] = true; //create a property  for the key being pressed
+                    //https://css-tricks.com/snippets/javascript/javascript-keycodes/
+                    //console.log(JSON.stringify(keysDown));
+                });
+
+                window.addEventListener("keyup", function (event) {
+                    delete  keysDown[event.keyCode];
+                });
+
+                //Checks input W A S D controls
+                function CheckTurns() {
+                    if (!controls.IJKLCamera) {
+                        UpdateGUI(); //Updates the speed
+                        //Forward speed and stop speed
+                        if (keysDown[87] && (MaxSpeed > Speed)) { // W and checks if max has not been reached
+                            Speed += Acceleration;
+                        } else if (Speed !== 0 && Speed > StopSpeed) {
+                            Speed += -NormalDeceleration;
+                        }
+
+                        //Reverse and stop speed 
+                        if (keysDown[83] && (MaxSpeedReverse > ReverseSpeed)) { // S and checks if max has not been reached
+                            ReverseSpeed += Acceleration;
+                        } else if (ReverseSpeed !== 0 && ReverseSpeed > StopSpeed) {
+                            ReverseSpeed += -NormalDeceleration;
+                        }
+
+                        //If space is pressed to turn faster
+                        if (keysDown[32] && Speed > SpeedLimitForTurning) { // Space
+                            SpaceButton = 0.02; //How intense the turning speed is increased
+                            Speed += -NormalDeceleration * 2;
+                        } else {
+                            SpaceButton = 0;
+                        }
+
+                        //If space is pressed to turn faster
+                        if (keysDown[32] && ReverseSpeed > SpeedLimitForTurning) { // Space
+                            ReverseSpeed += -NormalDeceleration * 2;
+                            SpaceButton = 0.02;
+                        }
+
+                        //Accellerate and turns
+                        if (keysDown[87]) {
+                            if (keysDown[68] && Speed > SpeedLimitForTurning) { // w + d
+                                TurnRight();
+                                WheelRotationRight();
+                            } else if (keysDown[65] && Speed > SpeedLimitForTurning) { // w + a
+                                TurnLeft();
+                                WheelRotationLeft();
+                            } else
+                                WheelStraight();
+                        }
+
+                        //Reverse and turns
+                        if (keysDown[83]) {
+                            if (keysDown[68] && ReverseSpeed > SpeedLimitForTurning) { // s + d
+                                if (Speed > ReverseSpeed) {
+                                    LightTurnRight();
+                                    WheelRotationRight();
+                                } else {
+                                    TurnLeft();
+                                    WheelRotationRight();
+                                }
+                            } else if (keysDown[65] && ReverseSpeed > SpeedLimitForTurning) { // s + a
+                                if (Speed > ReverseSpeed) {
+                                    LightTurnLeft();
+                                    WheelRotationLeft();
+                                } else {
+                                    TurnRight();
+                                    WheelRotationLeft();
+                                }
+                            } else
+                                WheelStraight();
+                        }
+
+                        //Turning without accelleration
+                        if (!keysDown[87] && !keysDown[83]) { //      not w and not s
+                            if (keysDown[68] && Speed > SpeedLimitForTurning) { //D if speed is more than 0,turns. Checks for speed overlap 
+                                TurnRight();
+                                WheelRotationRight();
+                            } else if (keysDown[65] && Speed > SpeedLimitForTurning) { // A    if speed is more than 0, turns. Checks for speed overlap
+                                WheelRotationLeft();
+                                TurnLeft();
+                            } else if (keysDown[68] && ReverseSpeed > SpeedLimitForTurning) { // A       if reverse speed is more than 0, turns. Checks for speed overlap
+                                TurnLeft();
+                                WheelRotationRight();
+                            } else if (keysDown[65] && ReverseSpeed > SpeedLimitForTurning) { // D      if reverse speed is more than 0, turns. Checks for speed overlap
+                                TurnRight();
+                                WheelRotationLeft();
+                            } else if (keysDown[65]) { // Just a
+                                WheelRotationLeft();
+                            } else if (keysDown[68]) { // Just d
+                                WheelRotationRight();
+                            } else
+                                WheelStraight();
+                        }
+                    } else {
+                        //Setting speed to 0 when camera view is turned on
+                        Speed = 0;
+                        ReverseSpeed = 0;
+                    }
+                }
+
+                var carGroupRadius = 25; //Radius of the car (used in checking the boundaries)
+                var Acceleration = 0.01; // Speed at which the car speeds up
+                var NormalDeceleration = 0.01; // Normal deceleration if nothing is pressed
+                var SpeedLimitForTurning = 0.05; //Setting a limit where the car no longer turns when it reaches this speed
+                var StopSpeed = 0; // Stop speed (if Deceleration does not nicely remove the acceleration, it has to be set to 0.0001
+                var MaxSpeed = 3; // Maximum car speed
+                var MaxSpeedReverse = 1; //Maximum car speed reverse
+                var angle = 0.02; // At which the car turns
+                var SpaceButton = 0; // If space is clicked, increases the turn speed
+
+                //Updates car movement
+                function Update() {
+                    AccelerateCar();
+                    BreakCar();
+                    CheckTurns();
+                }
+
+                //IJKL Camera controls. Initialized in CameraUpdate()
+                function IJKLCamera() {
+                    keypress.simple_combo("i", function () {
+                        camera.position.x -= 0.5 * Math.sin(camera.rotation.y);
+                        camera.position.z -= 0.5 * Math.cos(camera.rotation.y);
+                    });
+
+                    keypress.simple_combo("k", function () {
+                        camera.position.x += 0.5 * Math.sin(camera.rotation.y);
+                        camera.position.z += 0.5 * Math.cos(camera.rotation.y);
+                    });
+
+                    keypress.simple_combo("j", function () {
+                        camera.rotation.y += 0.02;
+                    });
+
+                    keypress.simple_combo("l", function () {
+                        camera.rotation.y -= 0.02;
+                    });
+
+                    keypress.simple_combo("left", function () {
+                        orbitGroup.rotation.y -= 0.02;
+                    });
+
+                    keypress.simple_combo("right", function () {
+                        orbitGroup.rotation.y += 0.02;
+                    });
+
+                    keypress.simple_combo("up", function () {
+                        camera.position.y += 0.5;
+                        if (camera.position.y > 150) {
+                            camera.position.y = 150;
+                        }
+                    });
+
+                    keypress.simple_combo("down", function () {
+                        camera.position.y -= 0.5;
+                        if (camera.position.y < 1) {
+                            camera.position.y = 1;
+                        }
+                    });
+                }
+
+                //Creates the key listener
+                var keypress = new window.keypress.Listener();
+                //Updates the camera
+                function CameraUpdate() {
+                    if (!controls.StopCamera && !controls.IJKLCamera) {
+                        var relativeCameraOffset = new THREE.Vector3(0, 10, -50);
+
+                        var cameraOffset = relativeCameraOffset.applyMatrix4(carGroup.matrixWorld);
+
+                        controls.orbitAngle = 0;
+                        camera.position.x = cameraOffset.x;
+                        camera.position.y = cameraOffset.y;
+                        camera.position.z = cameraOffset.z;
+                        camera.lookAt(carGroup.position);
+                    } else if (controls.IJKLCamera) {
+                        IJKLCamera();
+                    }
+                }
+
+                var orbitGroup = new THREE.Object3D();
+                scene.add(orbitGroup);
+                orbitGroup.add(camera);
+
+                //Two spotlights clash at the middle and reset
+                function ClashSpotLight() {
+
+                    if (secondSpotLight.position.x > 0) {
+                        secondSpotLight.position.x -= 0.1;
+                    } else
+                        secondSpotLight.position.x = 300;
+                    if (secondSpotLight.position.z > 0) {
+                        secondSpotLight.position.z -= 0.1;
+                    } else
+                        secondSpotLight.position.z = 300;
+                    if (secondSpotLight.position.y > 0) {
+                        secondSpotLight.position.y -= 0.05;
+                    } else
+                        secondSpotLight.position.y = 150;
+
+                    spotLight.position.x = -secondSpotLight.position.x;
+                    spotLight.position.y = secondSpotLight.position.y;
+                    spotLight.position.z = -secondSpotLight.position.z;
+
+                    lightMesh.position.copy(spotLight.position);
+                    secondLightMesh.position.copy(secondSpotLight.position);
+                }
+
+                //Checks if boundaries of the dome were not broken by the driver (So the driver does not leave the dome)
+                function CheckBoundaries() {
+                    //return to starting position if the boundaries were broken
+                    if (Math.abs(carGroup.position.x) + carGroupRadius > limit) {
+                        carGroup.position.x = 0;
+                        carGroup.position.y = 0;
+                        carGroup.position.z = 0;
+                    }
+                    if (Math.abs(carGroup.position.z) + carGroupRadius > limit) {
+                        carGroup.position.x = 0;
+                        carGroup.position.y = 0;
+                        carGroup.position.z = 0;
+                    }
+                }
+
+                //Creates black tracks on the ground
+                function Tracks() {
+                    if (SpaceButton > 0) {
+                        var trackGeometry = new THREE.CubeGeometry(1, 0.01, 3);
+                        var trackMaterial = new THREE.MeshLambertMaterial({color: 0x000000});
+                        var track = new THREE.Mesh(trackGeometry, trackMaterial);
+                        track.position.copy(carGroup.position);
+                        scene.add(track);
+                    }
+                }
+
+                // add the output of the renderer to the html element
+                $("#WebGL-output").append(renderer.domElement);
+
+                //Renders the scene
+                render();
+                function render() {
+                    UpdateGUI();
+                    stats.update();
+                    Update(); //Updates the car movement
+                    CameraUpdate(); //Updates the camera
+                    ClashSpotLight(); // Clashes the spotlights and resets them
+                    CheckBoundaries(); //Checks boundaries for the car to not leave the dome
+                    Tracks(); //Sets tracks when space is pressed
+
+                    requestAnimationFrame(render);
+                    renderer.render(scene, camera);
+                }
+
+                function initStats() {
+                    var stats = new Stats();
+
+                    stats.setMode(0); // 0: fps, 1: ms
+
+                    // Align top-left
+                    stats.domElement.style.position = 'absolute';
+                    stats.domElement.style.left = '0px';
+                    stats.domElement.style.top = '0px';
+
+                    $("#Stats-output").append(stats.domElement);
+
+                    return stats;
+                }
+
+            });
+        </script>
+    </body>
+</html>
